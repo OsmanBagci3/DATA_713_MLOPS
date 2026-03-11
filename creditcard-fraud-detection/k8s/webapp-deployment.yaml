@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fraud-webapp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: fraud-webapp
+  template:
+    metadata:
+      labels:
+        app: fraud-webapp
+    spec:
+      containers:
+        - name: webapp
+          image: fraud-webapp:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8501
+          env:
+            - name: API_URL
+              value: "http://fraud-api-service:8000"
+            - name: API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: api-credentials
+                  key: admin-key
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: fraud-webapp-service
+spec:
+  type: NodePort
+  selector:
+    app: fraud-webapp
+  ports:
+    - port: 8501
+      targetPort: 8501
+      nodePort: 30085

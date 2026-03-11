@@ -1,0 +1,38 @@
+name: CD
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+env:
+  DOCKER_USER: ${{ secrets.DOCKER_USER }}
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            echo "TAG=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
+          else
+            echo "TAG=${{ github.sha }}" >> $GITHUB_ENV
+          fi
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USER }}
+          password: ${{ secrets.DOCKER_TOKEN }}
+      - run: |
+          docker build -f Dockerfile.api -t $DOCKER_USER/fraud-api:$TAG -t $DOCKER_USER/fraud-api:latest .
+          docker push $DOCKER_USER/fraud-api:$TAG && docker push $DOCKER_USER/fraud-api:latest
+          docker build -f Dockerfile.webapp -t $DOCKER_USER/fraud-webapp:$TAG -t $DOCKER_USER/fraud-webapp:latest .
+          docker push $DOCKER_USER/fraud-webapp:$TAG && docker push $DOCKER_USER/fraud-webapp:latest
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-kubectl@v3
+      - run: |
+          kubectl apply -f k8s/
+          kubectl set image deployment/fraud-api api=$DOCKER_USER/fraud-api:$TAG
+          kubectl set image deployment/fraud-webapp webapp=$DOCKER_USER/fraud-webapp:$TAG
+          kubectl rollout status deployment/fraud-api --timeout=120s
