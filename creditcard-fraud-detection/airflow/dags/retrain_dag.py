@@ -37,7 +37,7 @@ def task_train(**kwargs):
 def task_evaluate(**kwargs):
     from train.evaluate import promote_if_better
     promoted = promote_if_better()
-    return "notify_ok" if promoted else "notify_nope"
+    return "reload_api" if promoted else "join"
 
 
 def task_reload_api(**kwargs):

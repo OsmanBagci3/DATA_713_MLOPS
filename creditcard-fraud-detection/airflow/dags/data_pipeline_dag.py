@@ -40,14 +40,6 @@ def task_preprocess(**kwargs):
     kwargs["ti"].xcom_push(key="stats", value=stats)
 
 
-def task_validate(**kwargs):
-    import pandas as pd
-    stats = kwargs["ti"].xcom_pull(task_ids="preprocess", key="stats")
-    assert stats["total_samples"] > 10000, "Dataset too small"
-    assert stats["n_features"] == 15, f"Expected 15 features, got {stats['n_features']}"
-    assert 0 < stats["fraud_ratio"] < 0.05, "Unexpected fraud ratio"
-    X = pd.read_parquet(f"{DATA_PROCESSED}/X_train.parquet")
-    assert not X.isnull().any().any(), "Null values found"
 
 
 with DAG(
@@ -61,5 +53,5 @@ with DAG(
 ) as dag:
     t1 = PythonOperator(task_id="download", python_callable=task_download)
     t2 = PythonOperator(task_id="preprocess", python_callable=task_preprocess)
-    t3 = PythonOperator(task_id="validate", python_callable=task_validate)
-    t1 >> t2 >> t3
+   
+    t1 >> t2

@@ -18,7 +18,7 @@ x-airflow-env: &airflow-env
   MLFLOW_S3_ENDPOINT_URL: http://minio:9000
   AIRFLOW__WEBSERVER__SECRET_KEY: "supersecretkey"
   ENV: dev
-  DEV_SAMPLE_SIZE: "10000"
+  DEV_SAMPLE_SIZE: "0"
 
 services:
   # ---- Storage ----
