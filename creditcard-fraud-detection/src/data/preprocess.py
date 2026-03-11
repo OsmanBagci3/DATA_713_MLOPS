@@ -96,6 +96,20 @@ def load_and_preprocess(
     """Load PaySim CSV, engineer features, split, scale, and save parquet artifacts."""
     df = pd.read_csv(input_path)
 
+    # --- DEV MODE: reduce dataset for fast DevOps testing ---
+    sample_size = int(os.getenv("DEV_SAMPLE_SIZE", "0"))
+    if sample_size > 0 and len(df) > sample_size:
+        # Stratified sample to keep fraud ratio representative
+        fraud = df[df["isFraud"] == 1]
+        legit = df[df["isFraud"] == 0]
+        n_fraud = max(1, int(sample_size * len(fraud) / len(df)))
+        n_legit = sample_size - n_fraud
+        df = pd.concat([
+            fraud.sample(n=min(n_fraud, len(fraud)), random_state=42),
+            legit.sample(n=min(n_legit, len(legit)), random_state=42),
+        ]).reset_index(drop=True)
+        print(f"[DEV] Sampled to {len(df)} rows (fraud={df['isFraud'].sum()})")
+
     if "isFraud" not in df.columns:
         raise ValueError("Input CSV must contain 'isFraud' column")
 
