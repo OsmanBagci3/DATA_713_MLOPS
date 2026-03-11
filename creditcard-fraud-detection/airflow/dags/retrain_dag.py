@@ -18,13 +18,32 @@ default_args = {
 
 
 def task_check_trigger(**kwargs):
+    import json
+    from pathlib import Path
+
     feedback_file = "/tmp/data/feedback/feedback.jsonl"
-    reason = "scheduled"
+    drift_report_file = "/tmp/data/processed/drift_report.json"
+    reasons = []
+
+    # --- Feedback-based trigger ---
     if os.path.exists(feedback_file):
         with open(feedback_file) as f:
             count = sum(1 for _ in f)
         if count >= 10:
-            reason = f"feedback ({count} entries)"
+            reasons.append(f"feedback ({count} entries)")
+
+    # --- Drift-based trigger (KL divergence) ---
+    if os.path.exists(drift_report_file):
+        with open(drift_report_file) as f:
+            report = json.load(f)
+        if report.get("drift_detected"):
+            drifted = report.get("drifted_features", [])
+            max_kl = report.get("max_kl", 0)
+            reasons.append(
+                f"data_drift ({len(drifted)} feature(s) drifted, max KL={max_kl:.4f})"
+            )
+
+    reason = "; ".join(reasons) if reasons else "scheduled"
     kwargs["ti"].xcom_push(key="reason", value=reason)
 
 

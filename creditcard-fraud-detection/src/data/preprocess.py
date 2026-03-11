@@ -140,6 +140,12 @@ def load_and_preprocess(
     joblib.dump(scaler, os.path.join(output_dir, "scaler.joblib"))
     joblib.dump(TYPE_MAPPING, os.path.join(output_dir, "type_mapping.joblib"))
 
+    # ---- Drift reference: save scaled X_train distributions ----
+    # We use the scaled features as reference so that subsequent runs compared
+    # via task_detect_drift (which loads X_train.parquet → scaled) are consistent.
+    from data.drift import run_drift_detection
+    run_drift_detection(processed_dir=output_dir, current_df=X_train_scaled)
+
     fraud_ratio = float(y.mean())
     fraud_by_type = {}
     if "type" in df.columns:

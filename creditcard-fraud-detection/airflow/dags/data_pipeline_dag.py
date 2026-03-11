@@ -40,6 +40,36 @@ def task_preprocess(**kwargs):
     kwargs["ti"].xcom_push(key="stats", value=stats)
 
 
+def task_detect_drift(**kwargs):
+    """Compute KL divergence between reference and current feature distributions.
+
+    On the first pipeline run the current distributions are saved as the new
+    reference (bootstrap).  On subsequent runs a full KL divergence report is
+    produced and pushed to XCom so downstream tasks (e.g. retrain_pipeline)
+    can decide whether retraining is needed.
+    """
+    import pandas as pd
+    from data.drift import run_drift_detection
+
+    # Load freshly preprocessed features (unscaled X_train saved by preprocess)
+    X_train = pd.read_parquet(os.path.join(DATA_PROCESSED, "X_train.parquet"))
+
+    report = run_drift_detection(
+        processed_dir=DATA_PROCESSED,
+        current_df=X_train,
+    )
+
+    kwargs["ti"].xcom_push(key="drift_report", value=report)
+
+    if report["drift_detected"]:
+        drifted = report["drifted_features"]
+        max_kl = report.get("max_kl", "?")
+        print(
+            f"[DRIFT] {len(drifted)} feature(s) drifted "
+            f"(max KL={max_kl:.4f}, threshold={report['threshold']}): {drifted}"
+        )
+    else:
+        print(f"[DRIFT] No drift detected (max KL={report.get('max_kl', 0):.4f}).")
 
 
 with DAG(
@@ -53,5 +83,6 @@ with DAG(
 ) as dag:
     t1 = PythonOperator(task_id="download", python_callable=task_download)
     t2 = PythonOperator(task_id="preprocess", python_callable=task_preprocess)
-   
-    t1 >> t2
+    t3 = PythonOperator(task_id="detect_drift", python_callable=task_detect_drift)
+
+    t1 >> t2 >> t3
