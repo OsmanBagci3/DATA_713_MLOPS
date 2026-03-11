@@ -1,4 +1,13 @@
-"""DAG: Extract and preprocess PaySim data."""
+"""DAG: Extract and preprocess PaySim data.
+
+In this project, the PaySim CSV is expected to be uploaded to MinIO (S3-compatible)
+in bucket `data` with key `paysim.csv` (configurable via env).
+
+The DAG downloads the CSV from MinIO into the shared Airflow volume under
+`/tmp/data/raw/` so subsequent tasks (preprocess/train/live simulation) can reuse it.
+"""
+
+import os
 import sys
 from datetime import datetime, timedelta
 from airflow import DAG
@@ -14,17 +23,19 @@ default_args = {
     "email": ["team@paysim-fraud.local"],
 }
 
-DATA_RAW = "/tmp/data/raw/paysim.csv"
-DATA_PROCESSED = "/tmp/data/processed"
+DATA_RAW = os.getenv("PAYSIM_LOCAL_PATH", "/tmp/data/raw/paysim.csv")
+DATA_PROCESSED = os.getenv("PAYSIM_PROCESSED_DIR", "/tmp/data/processed")
 
 
 def task_download(**kwargs):
     from data.download import download_dataset
+    os.makedirs(os.path.dirname(DATA_RAW), exist_ok=True)
     download_dataset(output_path=DATA_RAW)
 
 
 def task_preprocess(**kwargs):
     from data.preprocess import load_and_preprocess
+    os.makedirs(DATA_PROCESSED, exist_ok=True)
     stats = load_and_preprocess(input_path=DATA_RAW, output_dir=DATA_PROCESSED)
     kwargs["ti"].xcom_push(key="stats", value=stats)
 

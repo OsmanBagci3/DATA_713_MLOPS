@@ -1,5 +1,8 @@
 """DAG: Simulate live transaction streaming."""
-import sys, os, json
+
+import json
+import os
+import sys
 from datetime import datetime, timedelta
 from airflow import DAG
 from airflow.operators.python import PythonOperator
@@ -11,7 +14,7 @@ default_args = {"owner": "mlops-team", "retries": 1, "retry_delay": timedelta(mi
 
 def task_simulate(**kwargs):
     from data.preprocess import simulate_live_data
-    raw_path = "/tmp/data/raw/paysim.csv"
+    raw_path = os.getenv("PAYSIM_LOCAL_PATH", "/tmp/data/raw/paysim.csv")
     if not os.path.exists(raw_path):
         raise FileNotFoundError(f"Raw dataset not at {raw_path}")
 
