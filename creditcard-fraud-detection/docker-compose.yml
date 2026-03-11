@@ -16,6 +16,7 @@ x-airflow-env: &airflow-env
   AWS_ACCESS_KEY_ID: minioadmin
   AWS_SECRET_ACCESS_KEY: minioadmin
   MLFLOW_S3_ENDPOINT_URL: http://minio:9000
+  AIRFLOW__WEBSERVER__SECRET_KEY: "supersecretkey"
   ENV: dev
 
 services:
