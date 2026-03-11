@@ -71,17 +71,10 @@ with DAG(
     t_eval = BranchPythonOperator(task_id="evaluate", python_callable=task_evaluate)
     t_reload = PythonOperator(task_id="reload_api", python_callable=task_reload_api,
                                trigger_rule="none_failed_min_one_success")
-    t_ok = EmailOperator(task_id="notify_ok", to="team@paysim-fraud.local",
-                          subject="[PaySim] New model promoted",
-                          html_content="<p>A new model has been promoted to Production.</p>")
-    t_nope = EmailOperator(task_id="notify_nope", to="team@paysim-fraud.local",
-                            subject="[PaySim] No improvement",
-                            html_content="<p>New model did not beat production.</p>")
     t_cleanup = PythonOperator(task_id="cleanup", python_callable=task_cleanup,
                                 trigger_rule="none_failed")
     t_join = EmptyOperator(task_id="join", trigger_rule="none_failed_min_one_success")
 
     t_check >> t_train >> t_eval
-    t_eval >> t_ok >> t_reload >> t_join
-    t_eval >> t_nope >> t_join
+    t_eval >> t_reload >> t_join
     t_join >> t_cleanup

@@ -5,8 +5,10 @@ import logging
 import pandas as pd
 import mlflow
 import mlflow.sklearn
+from imblearn.over_sampling import SMOTE
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import (
+    balanced_accuracy_score,
     f1_score,
     precision_score,
     recall_score,
@@ -45,7 +47,15 @@ def train_model(
     y_test = pd.read_parquet(os.path.join(data_dir, "y_test.parquet")).squeeze()
 
     logger.info(f"Training: {X_train.shape}, Test: {X_test.shape}")
-    logger.info(f"Fraud in train: {y_train.sum()} ({y_train.mean():.4%})")
+    logger.info(f"Fraud in train (before SMOTE): {y_train.sum()} ({y_train.mean():.4%})")
+
+    # --- SMOTE: oversample minority class to handle imbalanced data ---
+    smote = SMOTE(random_state=42)
+    X_train_res, y_train_res = smote.fit_resample(X_train, y_train)
+    logger.info(
+        f"After SMOTE: {X_train_res.shape[0]} samples, "
+        f"fraud={y_train_res.sum()} ({y_train_res.mean():.4%})"
+    )
 
     with mlflow.start_run() as run:
         params = {
@@ -58,15 +68,18 @@ def train_model(
             "min_samples_leaf": 2,
         }
         mlflow.log_params(params)
-        mlflow.log_param("train_size", len(X_train))
+        mlflow.log_param("train_size_original", len(X_train))
+        mlflow.log_param("train_size_after_smote", len(X_train_res))
         mlflow.log_param("test_size", len(X_test))
         mlflow.log_param("n_features", X_train.shape[1])
-        mlflow.log_param("fraud_ratio_train", float(y_train.mean()))
+        mlflow.log_param("fraud_ratio_train_original", float(y_train.mean()))
+        mlflow.log_param("fraud_ratio_train_smote", float(y_train_res.mean()))
         mlflow.log_param("dataset", "PaySim")
+        mlflow.log_param("oversampling", "SMOTE")
 
-        logger.info("Training RandomForest...")
+        logger.info("Training RandomForest on SMOTE-resampled data...")
         model = RandomForestClassifier(**params)
-        model.fit(X_train, y_train)
+        model.fit(X_train_res, y_train_res)
 
         y_pred = model.predict(X_test)
         y_proba = model.predict_proba(X_test)[:, 1]
@@ -75,6 +88,7 @@ def train_model(
             "f1": f1_score(y_test, y_pred),
             "precision": precision_score(y_test, y_pred),
             "recall": recall_score(y_test, y_pred),
+            "balanced_accuracy": balanced_accuracy_score(y_test, y_pred),
             "roc_auc": roc_auc_score(y_test, y_proba),
             "avg_precision": average_precision_score(y_test, y_proba),
         }
